@@ -3,47 +3,41 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>RadioFinder</title>
+<title>RadioFinder V3</title>
 
 <style>
 body{
   margin:0;
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
   background:#f5f5f7;
-  color:#111827;
+  color:#111827
 }
-
 main{
-  max-width:700px;
+  max-width:760px;
   margin:auto;
-  padding:30px 18px;
+  padding:30px 18px
 }
-
 h1{
   text-align:center;
-  margin-bottom:8px;
+  margin-bottom:8px
 }
-
 .subtitle{
   text-align:center;
   color:#666;
-  margin-bottom:25px;
+  margin-bottom:25px
 }
-
 .search{
   display:flex;
   gap:10px;
-  margin-bottom:20px;
+  margin-bottom:12px
 }
-
 input{
   flex:1;
   padding:14px;
   border:1px solid #ccc;
   border-radius:12px;
-  font-size:16px;
+  font-size:16px
 }
-
 button{
   border:0;
   border-radius:12px;
@@ -51,36 +45,45 @@ button{
   font-size:16px;
   cursor:pointer;
   background:#111827;
-  color:white;
+  color:#fff
 }
-
 #status{
-  margin:15px 0;
+  margin:14px 0;
   color:#666;
+  line-height:1.45
 }
-
 .station{
-  background:white;
+  background:#fff;
   border-radius:16px;
   padding:16px;
   margin-bottom:12px;
-  box-shadow:0 2px 8px rgba(0,0,0,.08);
+  box-shadow:0 2px 8px rgba(0,0,0,.08)
 }
-
 .station-name{
   font-weight:700;
   font-size:18px;
-  margin-bottom:6px;
+  margin-bottom:6px
 }
-
-.station-info{
-  color:#666;
-  font-size:14px;
-  margin-bottom:12px;
+.track{
+  font-size:16px;
+  margin:7px 0
 }
-
+.muted{
+  color:#777;
+  font-size:14px
+}
+.match{
+  font-weight:700
+}
 audio{
   width:100%;
+  margin-top:10px
+}
+.note{
+  font-size:13px;
+  color:#777;
+  margin-top:18px;
+  line-height:1.45
 }
 </style>
 </head>
@@ -92,169 +95,510 @@ audio{
 <h1>RADIOFINDER</h1>
 
 <div class="subtitle">
-Trouve une radio et écoute son direct
+Trouve un artiste actuellement diffusé à la radio
 </div>
 
 <div class="search">
+
 <input
-  id="search"
-  type="text"
-  placeholder="Artiste ou titre"
-  value="Daft Punk"
->
-<button onclick="searchRadios()">Rechercher</button>
+id="search"
+type="text"
+placeholder="Artiste ou titre"
+value="Daft Punk">
+
+<button id="searchBtn">
+Rechercher
+</button>
+
 </div>
 
 <div id="status"></div>
+
 <div id="results"></div>
+
+<div class="note">
+RadioFinder recherche les radios françaises et tente de récupérer
+l'artiste et le titre actuellement diffusés.
+</div>
 
 </main>
 
 <script>
 
-let currentAudio = null;
+const API_SERVERS=[
+"https://de1.api.radio-browser.info",
+"https://nl1.api.radio-browser.info",
+"https://at1.api.radio-browser.info"
+];
 
-async function getApiServer(){
+const NOW_PLAYING_API="https://api.twj.es/";
 
-  const servers = [
-    "https://de1.api.radio-browser.info",
-    "https://nl1.api.radio-browser.info",
-    "https://at1.api.radio-browser.info"
-  ];
-
-  for(const server of servers){
-
-    try{
-      const response = await fetch(
-        server + "/json/stations/search?countrycode=FR&hidebroken=true&limit=20&order=clicktrend"
-      );
-
-      if(response.ok){
-        return server;
-      }
-
-    }catch(e){}
-  }
-
-  return null;
-}
+let currentAudio=null;
+let scanTimer=null;
+let stations=[];
 
 
-async function searchRadios(){
+function esc(s){
 
-  const results = document.getElementById("results");
-  const status = document.getElementById("status");
-
-  results.innerHTML = "";
-  status.textContent = "Recherche de radios françaises...";
-
-  const server = await getApiServer();
-
-  if(!server){
-
-    status.textContent =
-      "Impossible de contacter Radio Browser.";
-
-    return;
-  }
-
-  try{
-
-    const response = await fetch(
-      server +
-      "/json/stations/search?countrycode=FR&hidebroken=true&limit=20&order=clicktrend"
-    );
-
-    const stations = await response.json();
-
-    status.textContent =
-      stations.length + " radios françaises trouvées.";
-
-    stations.forEach(station => {
-
-      if(!station.url_resolved) return;
-
-      const div = document.createElement("div");
-
-      div.className = "station";
-
-      div.innerHTML = `
-
-        <div class="station-name">
-          ${escapeHtml(station.name || "Radio")}
-        </div>
-
-        <div class="station-info">
-          ${escapeHtml(station.codec || "")}
-          ${station.bitrate ? " • " + station.bitrate + " kbps" : ""}
-        </div>
-
-        <button>
-          Écouter
-        </button>
-
-      `;
-
-      const button = div.querySelector("button");
-
-      button.onclick = async () => {
-
-        if(currentAudio){
-
-          currentAudio.pause();
-          currentAudio.remove();
-
-        }
-
-        const audio = document.createElement("audio");
-
-        audio.controls = true;
-        audio.autoplay = true;
-        audio.src = station.url_resolved;
-
-        div.appendChild(audio);
-
-        currentAudio = audio;
-
-        try{
-
-          await fetch(
-            server +
-            "/json/url/" +
-            station.stationuuid
-          );
-
-        }catch(e){}
-
-      };
-
-      results.appendChild(div);
-
-    });
-
-  }catch(error){
-
-    console.error(error);
-
-    status.textContent =
-      "Erreur pendant la recherche.";
-
-  }
-}
-
-
-function escapeHtml(text){
-
-  return text
-    .replace(/&/g,"&amp;")
-    .replace(/</g,"&lt;")
-    .replace(/>/g,"&gt;")
-    .replace(/"/g,"&quot;")
-    .replace(/'/g,"&#039;");
+return String(s??"").replace(
+/[&<>"']/g,
+c=>({
+"&":"&amp;",
+"<":"&lt;",
+">":"&gt;",
+'"':"&quot;",
+"'":"&#039;"
+}[c])
+);
 
 }
 
-searchRadios();
+
+function norm(s){
+
+return String(s??"")
+.normalize("NFD")
+.replace(/[\u0300-\u036f]/g,"")
+.toLowerCase()
+.trim();
+
+}
+
+
+function matches(query,artist,title,songtitle){
+
+const q=norm(query);
+
+if(!q)return true;
+
+return [
+artist,
+title,
+songtitle
+].some(v=>norm(v).includes(q));
+
+}
+
+
+async function fetchStations(){
+
+for(const server of API_SERVERS){
+
+try{
+
+const r=await fetch(
+server+
+"/json/stations/search?countrycode=FR&hidebroken=true&is_https=true&limit=20&order=clicktrend"
+);
+
+if(r.ok){
+
+return await r.json();
+
+}
+
+}catch(e){}
+
+}
+
+throw new Error("Radio Browser indisponible");
+
+}
+
+
+async function getNowPlaying(url){
+
+const controller=new AbortController();
+
+const t=setTimeout(
+()=>controller.abort(),
+9000
+);
+
+try{
+
+const r=await fetch(
+NOW_PLAYING_API+
+"?url="+
+encodeURIComponent(url),
+{
+signal:controller.signal,
+cache:"no-store"
+}
+);
+
+if(!r.ok){
+
+throw new Error("metadata "+r.status);
+
+}
+
+return await r.json();
+
+}
+finally{
+
+clearTimeout(t);
+
+}
+
+}
+
+
+async function mapLimit(items,limit,fn){
+
+const out=new Array(items.length);
+
+const queue=items.map(
+(_,i)=>i
+);
+
+async function worker(){
+
+while(queue.length){
+
+const i=queue.shift();
+
+try{
+
+out[i]=await fn(
+items[i],
+i
+);
+
+}
+catch(e){
+
+out[i]={
+error:true
+};
+
+}
+
+}
+
+}
+
+await Promise.all(
+Array.from(
+{length:limit},
+worker
+)
+);
+
+return out;
+
+}
+
+
+function stationCard(
+st,
+meta,
+query
+){
+
+const artist=
+meta?.artist||"";
+
+const title=
+meta?.song||
+meta?.title||
+meta?.songtitle||
+"";
+
+const song=
+meta?.songtitle||
+[artist,title]
+.filter(Boolean)
+.join(" - ");
+
+const isMatch=
+matches(
+query,
+artist,
+title,
+song
+);
+
+const div=
+document.createElement("div");
+
+div.className="station";
+
+div.innerHTML=`
+
+<div class="station-name">
+${esc(st.name||"Radio")}
+</div>
+
+<div class="muted">
+${esc(st.codec||"")}
+${st.bitrate?
+" • "+esc(st.bitrate)+" kbps":
+""}
+</div>
+
+<div class="track">
+${song?
+esc(song):
+"Titre actuellement indisponible"}
+</div>
+
+<div class="${isMatch?"match":"muted"}">
+${isMatch?
+"Correspondance trouvée":
+"Pas de correspondance"}
+</div>
+
+<button class="listen">
+Écouter
+</button>
+
+`;
+
+div.querySelector(
+".listen"
+).onclick=async()=>{
+
+if(currentAudio){
+
+currentAudio.pause();
+
+currentAudio.remove();
+
+currentAudio=null;
+
+}
+
+const a=
+document.createElement("audio");
+
+a.controls=true;
+
+a.autoplay=true;
+
+a.src=
+st.url_resolved;
+
+div.appendChild(a);
+
+currentAudio=a;
+
+};
+
+return div;
+
+}
+
+
+async function scan(){
+
+const q=
+document.getElementById(
+"search"
+).value.trim();
+
+const status=
+document.getElementById(
+"status"
+);
+
+const results=
+document.getElementById(
+"results"
+);
+
+if(!q){
+
+status.textContent=
+"Entre un artiste ou un titre.";
+
+return;
+
+}
+
+if(scanTimer){
+
+clearTimeout(
+scanTimer
+);
+
+}
+
+results.innerHTML="";
+
+status.textContent=
+"Recherche des radios françaises...";
+
+
+try{
+
+stations=
+await fetchStations();
+
+}
+catch(e){
+
+status.textContent=
+"Impossible de récupérer les radios françaises.";
+
+return;
+
+}
+
+
+status.textContent=
+`${stations.length} radios sélectionnées.
+Lecture des métadonnées en cours...`;
+
+
+const metas=
+await mapLimit(
+stations,
+4,
+st=>getNowPlaying(
+st.url_resolved
+)
+);
+
+
+const found=[];
+
+const all=[];
+
+
+metas.forEach(
+(m,i)=>{
+
+const meta=
+m?.error?
+null:
+m;
+
+const artist=
+meta?.artist||"";
+
+const title=
+meta?.song||
+meta?.title||
+"";
+
+const song=
+meta?.songtitle||
+[artist,title]
+.filter(Boolean)
+.join(" - ");
+
+
+const card=
+stationCard(
+stations[i],
+meta,
+q
+);
+
+
+if(
+matches(
+q,
+artist,
+title,
+song
+)
+){
+
+found.push(card);
+
+}
+
+
+all.push({
+
+card,
+
+hasTrack:Boolean(song)
+
+});
+
+}
+);
+
+
+if(found.length){
+
+status.innerHTML=
+`<strong>
+${found.length}
+radio(s) semblent diffuser
+« ${esc(q)} ».
+</strong>`;
+
+found.forEach(
+c=>results.appendChild(c)
+);
+
+}
+else{
+
+status.innerHTML=
+`Aucune correspondance détectée pour
+« ${esc(q)} » lors de ce scan.`;
+
+const debug=
+document.createElement("div");
+
+debug.className="muted";
+
+debug.textContent=
+"Titres détectés sur les radios testées :";
+
+results.appendChild(
+debug
+);
+
+all
+.filter(x=>x.hasTrack)
+.slice(0,10)
+.forEach(
+x=>results.appendChild(
+x.card
+)
+);
+
+}
+
+
+scanTimer=
+setTimeout(
+scan,
+15000
+);
+
+}
+
+
+document.getElementById(
+"searchBtn"
+).onclick=scan;
+
+
+document.getElementById(
+"search"
+).addEventListener(
+"keydown",
+e=>{
+
+if(e.key==="Enter"){
+
+scan();
+
+}
+
+}
+);
+
+
+scan();
 
 </script>
 
