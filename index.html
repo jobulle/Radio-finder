@@ -6,79 +6,81 @@
 <title>RadioFinder</title>
 
 <style>
-body {
-    margin: 0;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    background: #f5f5f7;
-    color: #111827;
+body{
+  margin:0;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  background:#f5f5f7;
+  color:#111827;
 }
 
-main {
-    max-width: 700px;
-    margin: auto;
-    padding: 30px 18px;
+main{
+  max-width:700px;
+  margin:auto;
+  padding:30px 18px;
 }
 
-h1 {
-    text-align: center;
+h1{
+  text-align:center;
+  margin-bottom:8px;
 }
 
-.subtitle {
-    text-align: center;
-    color: #6b7280;
+.subtitle{
+  text-align:center;
+  color:#666;
+  margin-bottom:25px;
 }
 
-.search {
-    display: flex;
-    gap: 8px;
-    margin: 25px 0;
+.search{
+  display:flex;
+  gap:10px;
+  margin-bottom:20px;
 }
 
-input {
-    flex: 1;
-    padding: 14px;
-    border: 1px solid #ccc;
-    border-radius: 12px;
-    font-size: 17px;
+input{
+  flex:1;
+  padding:14px;
+  border:1px solid #ccc;
+  border-radius:12px;
+  font-size:16px;
 }
 
-button {
-    border: 0;
-    border-radius: 12px;
-    padding: 13px 16px;
-    background: #111827;
-    color: white;
-    font-weight: bold;
+button{
+  border:0;
+  border-radius:12px;
+  padding:12px 16px;
+  font-size:16px;
+  cursor:pointer;
+  background:#111827;
+  color:white;
 }
 
-.card {
-    background: white;
-    border-radius: 16px;
-    padding: 18px;
-    margin: 12px 0;
+#status{
+  margin:15px 0;
+  color:#666;
 }
 
-.live {
-    color: red;
-    font-weight: bold;
-    font-size: 13px;
+.station{
+  background:white;
+  border-radius:16px;
+  padding:16px;
+  margin-bottom:12px;
+  box-shadow:0 2px 8px rgba(0,0,0,.08);
 }
 
-.title {
-    font-size: 18px;
-    font-weight: bold;
-    margin: 8px 0;
+.station-name{
+  font-weight:700;
+  font-size:18px;
+  margin-bottom:6px;
 }
 
-.radio {
-    color: #6b7280;
-    margin-bottom: 12px;
+.station-info{
+  color:#666;
+  font-size:14px;
+  margin-bottom:12px;
 }
 
-.note {
-    margin-top: 25px;
-    color: #6b7280;
-    font-size: 13px;
+audio{
+  width:100%;
 }
 </style>
 </head>
@@ -90,122 +92,169 @@ button {
 <h1>RADIOFINDER</h1>
 
 <div class="subtitle">
-Trouve un artiste sur les radios
+Trouve une radio et écoute son direct
 </div>
 
 <div class="search">
-
 <input
-    id="artist"
-    value="Daft Punk"
-    placeholder="Rechercher un artiste">
-
-<button onclick="search()">
-Rechercher
-</button>
-
+  id="search"
+  type="text"
+  placeholder="Artiste ou titre"
+  value="Daft Punk"
+>
+<button onclick="searchRadios()">Rechercher</button>
 </div>
 
 <div id="status"></div>
-
 <div id="results"></div>
-
-<div class="note">
-Prototype RadioFinder V1.
-Les radios affichées sont actuellement des données de démonstration.
-</div>
 
 </main>
 
 <script>
 
-const demo = [
+let currentAudio = null;
 
-{
-    radio: "Station de démonstration A",
-    title: "One More Time"
-},
+async function getApiServer(){
 
-{
-    radio: "Station de démonstration B",
-    title: "Get Lucky"
-},
+  const servers = [
+    "https://de1.api.radio-browser.info",
+    "https://nl1.api.radio-browser.info",
+    "https://at1.api.radio-browser.info"
+  ];
 
-{
-    radio: "Station de démonstration C",
-    title: "Around the World"
+  for(const server of servers){
+
+    try{
+      const response = await fetch(
+        server + "/json/stations/search?countrycode=FR&hidebroken=true&limit=20&order=clicktrend"
+      );
+
+      if(response.ok){
+        return server;
+      }
+
+    }catch(e){}
+  }
+
+  return null;
 }
 
-];
 
-function search() {
+async function searchRadios(){
 
-    const artist =
-        document.getElementById("artist").value.trim();
+  const results = document.getElementById("results");
+  const status = document.getElementById("status");
 
-    const results =
-        document.getElementById("results");
+  results.innerHTML = "";
+  status.textContent = "Recherche de radios françaises...";
 
-    const status =
-        document.getElementById("status");
+  const server = await getApiServer();
 
-    if (!artist) {
-
-        status.textContent =
-            "Saisis un artiste.";
-
-        results.innerHTML = "";
-
-        return;
-    }
+  if(!server){
 
     status.textContent =
-        "Recherche...";
+      "Impossible de contacter Radio Browser.";
 
-    results.innerHTML = "";
+    return;
+  }
 
-    setTimeout(function() {
+  try{
 
-        status.textContent =
-            demo.length + " stations trouvées";
-
-        results.innerHTML =
-            demo.map(function(station) {
-
-                return `
-                <div class="card">
-
-                    <div class="live">
-                        ● EN DIRECT — DÉMO
-                    </div>
-
-                    <div class="title">
-                        ${artist} — ${station.title}
-                    </div>
-
-                    <div class="radio">
-                        ${station.radio}
-                    </div>
-
-                    <button onclick="listen()">
-                        ▶ Écouter
-                    </button>
-
-                </div>
-                `;
-
-            }).join("");
-
-    }, 500);
-}
-
-function listen() {
-
-    alert(
-        "Le lecteur radio réel sera connecté dans la prochaine étape."
+    const response = await fetch(
+      server +
+      "/json/stations/search?countrycode=FR&hidebroken=true&limit=20&order=clicktrend"
     );
 
+    const stations = await response.json();
+
+    status.textContent =
+      stations.length + " radios françaises trouvées.";
+
+    stations.forEach(station => {
+
+      if(!station.url_resolved) return;
+
+      const div = document.createElement("div");
+
+      div.className = "station";
+
+      div.innerHTML = `
+
+        <div class="station-name">
+          ${escapeHtml(station.name || "Radio")}
+        </div>
+
+        <div class="station-info">
+          ${escapeHtml(station.codec || "")}
+          ${station.bitrate ? " • " + station.bitrate + " kbps" : ""}
+        </div>
+
+        <button>
+          Écouter
+        </button>
+
+      `;
+
+      const button = div.querySelector("button");
+
+      button.onclick = async () => {
+
+        if(currentAudio){
+
+          currentAudio.pause();
+          currentAudio.remove();
+
+        }
+
+        const audio = document.createElement("audio");
+
+        audio.controls = true;
+        audio.autoplay = true;
+        audio.src = station.url_resolved;
+
+        div.appendChild(audio);
+
+        currentAudio = audio;
+
+        try{
+
+          await fetch(
+            server +
+            "/json/url/" +
+            station.stationuuid
+          );
+
+        }catch(e){}
+
+      };
+
+      results.appendChild(div);
+
+    });
+
+  }catch(error){
+
+    console.error(error);
+
+    status.textContent =
+      "Erreur pendant la recherche.";
+
+  }
 }
+
+
+function escapeHtml(text){
+
+  return text
+    .replace(/&/g,"&amp;")
+    .replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;")
+    .replace(/'/g,"&#039;");
+
+}
+
+searchRadios();
 
 </script>
 
